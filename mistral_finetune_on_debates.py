@@ -123,11 +123,7 @@ def setup_accelerator(model):
 
     return accelerator, model
 
-def setup_trainer(model, tokenized_train_dataset, tokenized_val_dataset, trainer_args):
-    project = "debate-finetune-v3"
-    base_model_name = "mistral"
-    run_name = base_model_name + "-" + project
-    output_dir = "./" + run_name
+def setup_trainer(model, tokenizer, tokenized_train_dataset, tokenized_val_dataset, trainer_args):
 
     trainer = transformers.Trainer(
         model=model,
@@ -155,13 +151,10 @@ def evaluate_model(ft_model, debate_data, idx):
 def main():
     args = parse_arguments()
 
-    base_model_id, data_path, data_aug_path = args.base_model_id, args.data_path, args.data_aug_path
+    base_model_id, data_path, data_aug_path, project_name = args.base_model_id, args.data_path, args.data_aug_path, args.project_name
     tokenizer = setup_tokenizer(base_model_id)
     debate_data = load_debate_data(data_path)
     augmented_debate_data = load_debate_data(data_aug_path)
-
-    
-    tokenizer = setup_tokenizer(base_model_id)
 
     debate_data = load_debate_data(data_path)
     augmented_debate_data = load_debate_data(data_aug_path)
@@ -180,15 +173,25 @@ def main():
 
     train_dataset, eval_dataset = load_datasets()
 
-    tokenized_train_dataset = train_dataset
+    tokenized_train_dataset =  [tokenize_prompt(tokenizer, example) for example in train_dataset]
+    tokenized_val_dataset = [tokenize_prompt(tokenizer, example) for example in eval_dataset]
 
+    print(f"base_model_id: {base_model_id}")
     model = setup_model(base_model_id)
+
     accelerator, model = setup_accelerator(model)
+    
+    base_model_name = "mistral"
+    run_name = base_model_name + "-" + project_name
+    output_dir = "./" + run_name
+
+    run_name = f"{run_name}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"
+    output_dir = "./" + run_name
 
     trainer_args = transformers.TrainingArguments(
         output_dir=output_dir,
         warmup_steps=500,
-        per_device_train_batch_size=12,
+        per_device_train_batch_size=1,
         gradient_accumulation_steps=1,
         gradient_checkpointing=True,
         num_train_epochs=20,
@@ -201,12 +204,10 @@ def main():
         evaluation_strategy="epoch",
         do_eval=True,
         report_to="wandb",
-        run_name=f"{run_name}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"
+        run_name=run_name
     )
 
-    tokenized_val_dataset = eval_dataset.map(tokenize_prompt)
-
-    trainer = setup_trainer(model, tokenized_train_dataset, tokenized_val_dataset, trainer_args)
+    trainer = setup_trainer(model, tokenizer,  tokenized_train_dataset, tokenized_val_dataset, trainer_args)
 
     model.config.use_cache = False
     trainer.train()
@@ -235,7 +236,7 @@ def parse_arguments():
     parser.add_argument("--base_model_id", type=str, default="mistralai/Mistral-7B-v0.1", help="Base model identifier")
     parser.add_argument("--data_path", type=str, default="data/debates/debate_data_v2.json", help="Path to debate data")
     parser.add_argument("--data_aug_path", type=str, default="data/debates/augmented_debates.json", help="Path to augmented debate data")
-
+    parser.add_argument("--project_name", type=str, default="debate-finetune-v3", help="Project Name")
     return parser.parse_args()
 
 if __name__ == "__main__":

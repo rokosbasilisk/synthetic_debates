@@ -1,3 +1,5 @@
 checkpoints/*
 mistral-debate-finetune-v3/*
 HALOs/
+wandb/
+KTO/
