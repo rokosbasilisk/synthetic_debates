@@ -82,7 +82,7 @@ def tokenize_prompt(tokenizer, example):
     return result
 
 def setup_model(base_model_id):
-    model = AutoModelForCausalLM.from_pretrained(base_model_id, device_map="balanced", use_safetensors=False)
+    model = AutoModelForCausalLM.from_pretrained(base_model_id, device_map="auto", use_safetensors=False)
     model.gradient_checkpointing_enable()
     model = prepare_model_for_kbit_training(model)
 
